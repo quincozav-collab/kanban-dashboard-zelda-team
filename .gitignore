@@ -1,0 +1,14 @@
+# Binarios de Go y ejecutables
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.out
+*.test
+
+# Archivos del sistema operativo y editor
+.DS_Store
+Thumbs.db
+.vscode/

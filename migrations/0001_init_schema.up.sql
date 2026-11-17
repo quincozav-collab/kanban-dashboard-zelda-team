@@ -1,0 +1,25 @@
+CREATE TABLE IF NOT EXISTS boards (
+    id VARCHAR(36) PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS columns (
+    id VARCHAR(36) PRIMARY KEY,
+    board_id VARCHAR(36) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    wip_limit INT NOT NULL DEFAULT 0,
+    position INT NOT NULL,
+    FOREIGN KEY (board_id) REFERENCES boards(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS cards (
+    id VARCHAR(36) PRIMARY KEY,
+    column_id VARCHAR(36) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    priority VARCHAR(50),
+    due_date TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (column_id) REFERENCES columns(id) ON DELETE CASCADE
+);
