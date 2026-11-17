@@ -25,3 +25,13 @@ func (r *MySQLBoardRepository) Save(b *board.Board) error {
 	}
 	return nil
 }
+
+// SaveCard persiste una tarjeta en la base de datos MySQL
+func (r *MySQLBoardRepository) SaveCard(id, columnID, title, description, priority string) error {
+	query := "INSERT INTO cards (id, column_id, title, description, priority) VALUES (?, ?, ?, ?, ?)"
+	_, err := r.db.Exec(query, id, columnID, title, description, priority)
+	if err != nil {
+		return fmt.Errorf("error saving card: %w", err)
+	}
+	return nil
+}

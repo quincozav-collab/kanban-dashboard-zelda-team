@@ -37,7 +37,11 @@ func main() {
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("API Kanban funcionando al 100% 🚀"))
 	})
-
+	// --- PEGA TUS ENDPOINTS AQUí ---
+	handler := infrastructure.NewBoardHandler(repo)
+	http.HandleFunc("/boards", handler.CreateBoardEndpoint)
+	http.HandleFunc("/cards", handler.CreateCardEndpoint)
+	// -----------------------------
 	fmt.Println("Servidor corriendo en el puerto 8080...")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
