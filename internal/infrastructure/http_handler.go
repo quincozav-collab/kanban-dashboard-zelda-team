@@ -48,14 +48,13 @@ func (h *BoardHandler) CreateBoardEndpoint(w http.ResponseWriter, r *http.Reques
 	json.NewEncoder(w).Encode(map[string]string{"mensaje": "Tablero creado exitosamente 🚀"})
 }
 
-// CreateCardEndpoint maneja la creación de una tarjeta vía POST
 func (h *BoardHandler) CreateCardEndpoint(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
 		return
 	}
 
-	var req struct {
+	var cardData struct {
 		ID          string `json:"id"`
 		ColumnID    string `json:"column_id"`
 		Title       string `json:"title"`
@@ -63,21 +62,37 @@ func (h *BoardHandler) CreateCardEndpoint(w http.ResponseWriter, r *http.Request
 		Priority    string `json:"priority"`
 	}
 
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
-		http.Error(w, "Error al leer los datos de la tarjeta", http.StatusBadRequest)
+	if err := json.NewDecoder(r.Body).Decode(&cardData); err != nil {
+		http.Error(w, "Entrada inválida", http.StatusBadRequest)
 		return
 	}
 
-	err = h.repo.SaveCard(req.ID, req.ColumnID, req.Title, req.Description, req.Priority)
+	// --- VALIDACIÓN DE LÍMITE WIP ---
+	// Definimos un límite máximo de 3 tarjetas por columna para este ejemplo
+	const maxWIPLimit = 3
+	currentCount, err := h.repo.CountCardsByColumn(cardData.ColumnID)
 	if err != nil {
-		http.Error(w, "Error al guardar la tarjeta en la base de datos", http.StatusInternalServerError)
+		http.Error(w, "Error al validar el límite WIP", http.StatusInternalServerError)
+		return
+	}
+
+	if currentCount >= maxWIPLimit {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict) // Código HTTP 409 Conflict
+		w.Write([]byte(`{"error": "Límite WIP excedido: la columna ya alcanzó el máximo de tarjetas permitidas"}`))
+		return
+	}
+	// ---------------------------------
+
+	err = h.repo.SaveCard(cardData.ID, cardData.ColumnID, cardData.Title, cardData.Description, cardData.Priority)
+	if err != nil {
+		http.Error(w, "Error al guardar la tarjeta", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(map[string]string{"mensaje": "Tarjeta creada exitosamente 🚀"})
+	w.Write([]byte(`{"message": "Tarjeta creada exitosamente bajo las reglas WIP"}`))
 }
 
 // Endpoint para listar todos los tableros

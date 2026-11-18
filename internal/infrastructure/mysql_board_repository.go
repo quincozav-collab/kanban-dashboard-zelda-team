@@ -80,3 +80,14 @@ func (r *MySQLBoardRepository) GetAllCards() ([]card.Card, error) {
 	}
 	return cards, nil
 }
+
+// CountCardsByColumn cuenta cuántas tarjetas existen en una columna específica
+func (r *MySQLBoardRepository) CountCardsByColumn(columnID string) (int, error) {
+	query := "SELECT COUNT(*) FROM cards WHERE column_id = ?"
+	var count int
+	err := r.db.QueryRow(query, columnID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("error counting cards by column: %w", err)
+	}
+	return count, nil
+}
