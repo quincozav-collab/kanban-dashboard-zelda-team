@@ -39,9 +39,27 @@ func main() {
 	})
 	// --- PEGA TUS ENDPOINTS AQUí ---
 	handler := infrastructure.NewBoardHandler(repo)
-	http.HandleFunc("/boards", handler.CreateBoardEndpoint)
-	http.HandleFunc("/cards", handler.CreateCardEndpoint)
-	// -----------------------------
+
+	// Endpoints REST del Tablero y Tarjetas (Soportan POST y GET)
+	http.HandleFunc("/boards", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			handler.CreateBoardEndpoint(w, r)
+		} else if r.Method == http.MethodGet {
+			handler.GetBoardsEndpoint(w, r)
+		} else {
+			http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
+		}
+	})
+
+	http.HandleFunc("/cards", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			handler.CreateCardEndpoint(w, r)
+		} else if r.Method == http.MethodGet {
+			handler.GetCardsEndpoint(w, r)
+		} else {
+			http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
+		}
+	})
 	fmt.Println("Servidor corriendo en el puerto 8080...")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }

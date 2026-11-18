@@ -79,3 +79,37 @@ func (h *BoardHandler) CreateCardEndpoint(w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(map[string]string{"mensaje": "Tarjeta creada exitosamente 🚀"})
 }
+
+// Endpoint para listar todos los tableros
+func (h *BoardHandler) GetBoardsEndpoint(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
+		return
+	}
+
+	boards, err := h.repo.GetAllBoards()
+	if err != nil {
+		http.Error(w, "Error al obtener los tableros", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(boards)
+}
+
+// Endpoint para listar todas las tarjetas
+func (h *BoardHandler) GetCardsEndpoint(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
+		return
+	}
+
+	cards, err := h.repo.GetAllCards()
+	if err != nil {
+		http.Error(w, "Error al obtener las tarjetas", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(cards)
+}
