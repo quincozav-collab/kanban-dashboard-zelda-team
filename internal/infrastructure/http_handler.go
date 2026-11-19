@@ -128,3 +128,43 @@ func (h *BoardHandler) GetCardsEndpoint(w http.ResponseWriter, r *http.Request) 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(cards)
 }
+func (h *BoardHandler) MoveCardEndpoint(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPatch && r.Method != http.MethodPut {
+		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var moveData struct {
+		CardID         string `json:"id"`
+		TargetColumnID string `json:"column_id"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&moveData); err != nil || moveData.CardID == "" || moveData.TargetColumnID == "" {
+		http.Error(w, "Entrada inválida: se requieren id y column_id", http.StatusBadRequest)
+		return
+	}
+
+	// Validación de límite WIP en la columna destino
+	const maxWIPLimit = 3
+	currentCount, err := h.repo.CountCardsByColumn(moveData.TargetColumnID)
+	if err != nil {
+		http.Error(w, "Error al validar el límite WIP", http.StatusInternalServerError)
+		return
+	}
+
+	if currentCount >= maxWIPLimit {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		w.Write([]byte(`{"error": "Límite WIP excedido: la columna destino ya alcanzó el máximo de tarjetas permitidas"}`))
+		return
+	}
+
+	if err := h.repo.MoveCard(moveData.CardID, moveData.TargetColumnID); err != nil {
+		http.Error(w, "Error al mover la tarjeta", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"message": "Tarjeta movida exitosamente"}`))
+}

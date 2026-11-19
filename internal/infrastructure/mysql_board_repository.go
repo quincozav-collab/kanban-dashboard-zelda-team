@@ -91,3 +91,22 @@ func (r *MySQLBoardRepository) CountCardsByColumn(columnID string) (int, error) 
 	}
 	return count, nil
 }
+
+// MoveCard actualiza la columna asignada a una tarjeta existente
+func (r *MySQLBoardRepository) MoveCard(cardID string, targetColumnID string) error {
+	query := "UPDATE cards SET column_id = ? WHERE id = ?"
+	result, err := r.db.Exec(query, targetColumnID, cardID)
+	if err != nil {
+		return fmt.Errorf("error moving card: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("error checking affected rows: %w", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("card not found")
+	}
+
+	return nil
+}

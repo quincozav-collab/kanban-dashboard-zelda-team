@@ -60,6 +60,7 @@ func main() {
 			http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
 		}
 	})
+	http.HandleFunc("/cards/move", handler.MoveCardEndpoint)
 	fmt.Println("Servidor corriendo en el puerto 8080...")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
