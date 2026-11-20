@@ -168,3 +168,19 @@ func (h *BoardHandler) MoveCardEndpoint(w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"message": "Tarjeta movida exitosamente"}`))
 }
+func (h *BoardHandler) GetMetricsEndpoint(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
+		return
+	}
+
+	metrics, err := h.repo.GetMetrics()
+	if err != nil {
+		http.Error(w, "Error al calcular las métricas", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(metrics)
+}
