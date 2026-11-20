@@ -62,6 +62,7 @@ func main() {
 	})
 	http.HandleFunc("/cards/move", handler.MoveCardEndpoint)
 	http.HandleFunc("/metrics", handler.GetMetricsEndpoint)
+	http.Handle("/", http.FileServer(http.Dir("./frontend")))
 	fmt.Println("Servidor corriendo en el puerto 8080...")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }

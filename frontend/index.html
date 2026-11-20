@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kanban Dashboard — Zelda Team</title>
+  <style>
+    * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
+    body { margin: 0; background: #0f172a; color: #f8fafc; padding: 20px; }
+    h1 { margin: 0 0 16px; font-size: 1.5rem; }
+    .metrics-bar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .metric-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 14px;
+    }
+    .metric-label { font-size: 0.8rem; color: #94a3b8; }
+    .metric-value { font-size: 1.4rem; font-weight: 700; margin-top: 4px; color: #38bdf8; }
+    .create-form {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      background: #1e293b;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid #334155;
+      margin-bottom: 20px;
+    }
+    .create-form input, .create-form select, .create-form button, .card-actions select, .card-actions button {
+      background: #0f172a;
+      color: #f8fafc;
+      border: 1px solid #475569;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 0.9rem;
+    }
+    button { cursor: pointer; background: #2563eb !important; border-color: #3b82f6 !important; font-weight: 600; }
+    button:hover { background: #1d4ed8 !important; }
+    .alert {
+      padding: 10px 14px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      display: none;
+      font-size: 0.9rem;
+    }
+    .alert.error { display: block; background: #450a0a; border: 1px solid #dc2626; color: #fecaca; }
+    .alert.ok { display: block; background: #052e16; border: 1px solid #16a34a; color: #bbf7d0; }
+    .board {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 14px;
+      align-items: start;
+    }
+    .column {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .col-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #334155;
+    }
+    .wip-badge {
+      font-size: 0.8rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #334155;
+      color: #e2e8f0;
+    }
+    .wip-badge.full { background: #7f1d1d; color: #fecaca; }
+    .card {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 10px;
+    }
+    .card-title { font-weight: 600; margin-bottom: 4px; }
+    .card-desc { font-size: 0.85rem; color: #94a3b8; margin-bottom: 8px; }
+    .card-meta { font-size: 0.75rem; color: #64748b; margin-bottom: 8px; }
+    .card-actions { display: flex; gap: 6px; }
+    .card-actions select { flex: 1; padding: 5px; font-size: 0.8rem; }
+    .card-actions button { padding: 5px 10px; font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+  <h1>Tablero Kanban — Zelda Team</h1>
+
+  <div class="metrics-bar" id="metricsBar">
+    <div class="metric-card"><div class="metric-label">Tarjetas completadas</div><div class="metric-value" id="mCompleted">0</div></div>
+    <div class="metric-card"><div class="metric-label">Avg Lead Time (h)</div><div class="metric-value" id="mLead">0.00</div></div>
+    <div class="metric-card"><div class="metric-label">Avg Cycle Time (h)</div><div class="metric-value" id="mCycle">0.00</div></div>
+  </div>
+
+  <div id="alertBox" class="alert"></div>
+
+  <form class="create-form" id="createCardForm">
+    <input type="text" id="cardId" placeholder="ID (ej. card-6)" required />
+    <input type="text" id="cardTitle" placeholder="Título de la tarjeta" required />
+    <input type="text" id="cardDesc" placeholder="Descripción" />
+    <select id="cardPriority">
+      <option value="Alta">Alta</option>
+      <option value="Media" selected>Media</option>
+      <option value="Baja">Baja</option>
+    </select>
+    <select id="cardCol">
+      <option value="col-1">col-1 (Backlog)</option>
+      <option value="col-2">col-2 (En progreso)</option>
+      <option value="col-3">col-3 (Revisión / Done)</option>
+      <option value="col-4">col-4 (Hecho)</option>
+    </select>
+    <button type="submit">Crear tarjeta</button>
+  </form>
+
+  <div class="board" id="boardContainer"></div>
+
+  <script>
+    const API = "http://localhost:8080";
+    let columnsData = [];
+    let cardsData = [];
+
+    function showAlert(msg, type = "ok") {
+      const box = document.getElementById("alertBox");
+      box.textContent = msg;
+      box.className = `alert ${type}`;
+    }
+
+    async function parseError(res) {
+      try {
+        const data = await res.json();
+        return data.error || data.message || `Error HTTP ${res.status}`;
+      } catch {
+        return (await res.text()) || `Error HTTP ${res.status}`;
+      }
+    }
+
+    function extractColumns(bJson) {
+      if (!bJson) return [];
+      const firstBoard = Array.isArray(bJson) ? bJson[0] : (bJson.boards?.[0] || bJson);
+      const cols = firstBoard?.columns || firstBoard?.Columns || (Array.isArray(bJson) ? bJson : []);
+      const validCols = cols.filter(c => c && (c.wip_limit !== undefined || c.WIPLimit !== undefined || c.name || c.Name));
+      return validCols.length ? validCols : [];
+    }
+
+    function extractCards(cJson) {
+      if (!cJson) return [];
+      if (Array.isArray(cJson)) return cJson;
+      return cJson.cards || cJson.Cards || [];
+    }
+
+    async function loadMetrics() {
+      const res = await fetch(`${API}/metrics`);
+      if (!res.ok) return;
+      const m = await res.json();
+      document.getElementById("mCompleted").textContent = m.completed_cards ?? 0;
+      document.getElementById("mLead").textContent = Number(m.avg_lead_time_hours ?? 0).toFixed(2);
+      document.getElementById("mCycle").textContent = Number(m.avg_cycle_time_hours ?? 0).toFixed(2);
+    }
+
+    async function loadBoard() {
+      const [boardsRes, cardsRes] = await Promise.all([
+        fetch(`${API}/boards`),
+        fetch(`${API}/cards`)
+      ]);
+
+      if (boardsRes.ok) {
+        const bJson = await boardsRes.json();
+        columnsData = extractColumns(bJson);
+      }
+
+      if (cardsRes.ok) {
+        const cJson = await cardsRes.json();
+        cardsData = extractCards(cJson);
+      }
+
+      renderBoard();
+      await loadMetrics();
+    }
+
+    function renderBoard() {
+      const container = document.getElementById("boardContainer");
+      container.innerHTML = "";
+
+      const cols = columnsData.length ? columnsData : [
+        { id: "col-1", name: "col-1", wip_limit: 3 },
+        { id: "col-2", name: "col-2", wip_limit: 2 },
+        { id: "col-3", name: "col-3", wip_limit: 2 },
+        { id: "col-4", name: "col-4", wip_limit: 0 }
+      ];
+
+      cols.forEach(col => {
+        const colId = col.id || col.ID;
+        const colName = col.name || col.Name || colId;
+        const wipLimit = col.wip_limit ?? col.WIPLimit ?? 0;
+        const colCards = cardsData.filter(c => (c.column_id || c.ColumnID) === colId);
+        const isFull = wipLimit > 0 && colCards.length >= wipLimit;
+
+        const colEl = document.createElement("div");
+        colEl.className = "column";
+        colEl.innerHTML = `
+          <div class="col-header">
+            <strong>${colName}</strong>
+            <span class="wip-badge ${isFull ? "full" : ""}">
+              WIP: ${colCards.length}${wipLimit > 0 ? `/${wipLimit}` : ""}
+            </span>
+          </div>
+          <div class="cards-list"></div>
+        `;
+
+        const listEl = colEl.querySelector(".cards-list");
+        colCards.forEach(card => {
+          const cardId = card.id || card.ID;
+          const title = card.title || card.Title || cardId;
+          const desc = card.description || card.Description || "";
+          const priority = card.priority || card.Priority || "Media";
+
+          const optionsHtml = cols.map(target => {
+            const tId = target.id || target.ID;
+            const selected = tId === colId ? "selected" : "";
+            return `<option value="${tId}" ${selected}>${tId}</option>`;
+          }).join("");
+
+          const cardEl = document.createElement("div");
+          cardEl.className = "card";
+          cardEl.innerHTML = `
+            <div class="card-title">${title}</div>
+            <div class="card-desc">${desc}</div>
+            <div class="card-meta">ID: ${cardId} · Prioridad: ${priority}</div>
+            <div class="card-actions">
+              <select id="move-select-${cardId}">${optionsHtml}</select>
+              <button onclick="moveCard('${cardId}')">Mover</button>
+            </div>
+          `;
+          listEl.appendChild(cardEl);
+        });
+
+        container.appendChild(colEl);
+      });
+    }
+
+    async function moveCard(cardId) {
+      const targetCol = document.getElementById(`move-select-${cardId}`).value;
+      const res = await fetch(`${API}/cards/move`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: cardId, column_id: targetCol })
+      });
+
+      if (!res.ok) {
+        showAlert(await parseError(res), "error");
+        return;
+      }
+
+      showAlert(`Tarjeta ${cardId} movida a ${targetCol}`, "ok");
+      await loadBoard();
+    }
+
+    document.getElementById("createCardForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const payload = {
+        id: document.getElementById("cardId").value.trim(),
+        title: document.getElementById("cardTitle").value.trim(),
+        description: document.getElementById("cardDesc").value.trim(),
+        priority: document.getElementById("cardPriority").value,
+        column_id: document.getElementById("cardCol").value
+      };
+
+      const res = await fetch(`${API}/cards`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) {
+        showAlert(await parseError(res), "error");
+        return;
+      }
+
+      e.target.reset();
+      showAlert(`Tarjeta ${payload.id} creada`, "ok");
+      await loadBoard();
+    });
+
+    loadBoard();
+  </script>
+</body>
+</html>
